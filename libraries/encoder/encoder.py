@@ -7,10 +7,12 @@ class Encoder:
     SW_PRESS = 4   #нажата
     SW_RELEASE = 8 #отжата
     
+    
     def __init__(self,dt,clk,sw=None):
         # фаза А, фаза В, кнопка
         self.dt_pin = Pin(dt, Pin.IN, Pin.PULL_UP)
         self.clk_pin = Pin(clk, Pin.IN, Pin.PULL_UP)
+        self.discreteness()       #установка количества тактов на оборов
         
         self.last_status = (self.dt_pin.value() << 1) | self.clk_pin.value()
         self.dt_pin.irq(handler=self.rotary_change, trigger=Pin.IRQ_FALLING | Pin.IRQ_RISING )
@@ -29,10 +31,12 @@ class Encoder:
         if new_status == self.last_status:
             return
         transition = (self.last_status << 2) | new_status
+        discret = self.discreteness(self.tact)
+        
         try:
-            if transition in [0b0001, 0b0111, 0b1110, 0b1000]:
+            if transition in discret['CW']:
                 micropython.schedule(self.call_handlers, Encoder.ROT_CW) #по часовой
-            elif transition in [0b1011, 0b1101, 0b0100, 0b0010]:
+            elif transition in discret['CCW']:
                 micropython.schedule(self.call_handlers, Encoder.ROT_CCW) #против часовой
         except RuntimeError:
             pass
@@ -57,3 +61,17 @@ class Encoder:
     def call_handlers(self, type):
         for handler in self.handlers:
             handler(type) # выполняется внешняя функция с аргументом из прерывания
+            
+    def discreteness(self, tact = 1):
+        self.tact = tact
+        #количество тактов на оборот. можно передать 1, 2, 4
+        list_CW = [0b0001, 0b0111, 0b1110, 0b1000]  #список четырех тактов по часовой
+        list_CCW = [0b1011, 0b1101, 0b0100, 0b0010] #список четырех тактов против часовой
+        
+        if (self.tact == 1):
+            rotation = {'CW':[list_CW[2]], 'CCW':[list_CCW[1]]}
+        elif (self.tact == 2):
+            rotation = {'CW':[list_CW[2], list_CW[0]], 'CCW':[list_CCW[1], list_CCW[3]]}
+        elif (self.tact == 4):
+            rotation = {'CW':list_CW, 'CCW':list_CCW}
+        return rotation

@@ -20,6 +20,7 @@ def encoder_changed(change):
         print('RELEASE')
 
 enc.add_handler(encoder_changed)
+enc.discreteness(2)
 
 while True:
     time.sleep_ms(10)
